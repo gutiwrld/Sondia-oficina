@@ -10,3 +10,5 @@ coverage
 .DS_Store
 /capturas/tmp
 /workers/*/var
+next-env.d.ts
+*.tsbuildinfo

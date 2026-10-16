@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import '@sondia/ui/tokens.css';
+
+@source '../../../packages/ui/src';
+
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-hover: var(--hover);
+  --color-linea: var(--linea);
+  --color-linea-fuerte: var(--linea-fuerte);
+  --color-texto: var(--texto);
+  --color-texto-2: var(--texto-2);
+  --color-texto-3: var(--texto-3);
+  --color-acento: var(--acento);
+  --color-acento-tinta: var(--acento-tinta);
+  --color-acento-suave: var(--acento-suave);
+  --color-acento-linea: var(--acento-linea);
+  --color-sobre-acento: var(--sobre-acento);
+  --color-cita: var(--cita);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', monospace;
+  --font-titular: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-logo: 'Sora Variable', 'Sora', var(--font-geist-sans), sans-serif;
+}
+
+html {
+  background: var(--fondo);
+  color: var(--texto);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+
+::selection {
+  background: var(--acento);
+  color: var(--sobre-acento);
+}
+
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* Tabla densa estilo Linear/Attio. */
+.tabla-densa {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.tabla-densa th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--fondo);
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-3);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--linea);
+  white-space: nowrap;
+}
+.tabla-densa td {
+  padding: 0 12px;
+  height: 36px;
+  border-bottom: 1px solid var(--linea);
+  white-space: nowrap;
+  color: var(--texto-2);
+}
+.tabla-densa tbody tr:hover td {
+  background: var(--hover);
+}
+
+/* Cita resaltada en la evidencia de la mesa. */
+mark.cita {
+  background: var(--cita);
+  color: var(--texto);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.sin-barra::-webkit-scrollbar {
+  display: none;
+}
+.sin-barra {
+  scrollbar-width: none;
+}
