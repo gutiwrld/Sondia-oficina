@@ -1,0 +1,15 @@
+{
+  "name": "sondia-oficina",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --filter @sondia/oficina dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:db": "bash supabase/tests/run.sh",
+    "seed:informe": "pnpm --filter @sondia/hunter seed:informe",
+    "capturas": "pnpm --filter @sondia/oficina capturas"
+  }
+}
