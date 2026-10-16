@@ -190,14 +190,37 @@ language sql immutable set search_path to '' as $$
     'telefonica.net','ono.com'])
 $$;
 
+-- Hostings compartidos (cada negocio es un subdominio) y plataformas sin dominio propio.
+-- Mismas listas que packages/core/src/dominios.ts (un test comprueba que coinciden).
+create or replace function agents.hosts_compartidos() returns text[]
+language sql immutable set search_path to '' as $$
+  select array[
+    'blogspot.com','blogspot.es','webnode.es','webnode.com','webnode.page','wordpress.com','wixsite.com',
+    'jimdofree.com','jimdo.com','jimdosite.com','weebly.com','site123.me','webcindario.com','es.tl',
+    'business.site','negocio.site','ueniweb.com','github.io','netlify.app','vercel.app','godaddysites.com',
+    'squarespace.com','mystrikingly.com','strikingly.com','webador.es','webador.com','myshopify.com','carrd.co',
+    'my.canva.site','canva.site','blogia.com','over-blog.com','over-blog.es','hostinger.es','hostingersite.com']
+$$;
+
+create or replace function agents.plataformas_sin_dominio() returns text[]
+language sql immutable set search_path to '' as $$
+  select array[
+    'google.com','google.es','facebook.com','instagram.com','tripadvisor.es','tripadvisor.com','booking.com',
+    'linktr.ee','wa.me','youtube.com','twitter.com','x.com','tiktok.com','airbnb.es','airbnb.com',
+    'escapadarural.com','clubrural.com','tuscasasrurales.com','paginasamarillas.es','linkedin.com']
+$$;
+
 -- Dominio registrable aproximado (el worker guarda el exacto con la lista de sufijos públicos;
 -- este sirve para las barreras de la base de datos y coincide en los dominios españoles habituales).
+-- En hostings compartidos devuelve el subdominio del negocio; en plataformas, null.
 create or replace function agents.dominio_registrable(p_entrada text) returns text
 language plpgsql immutable set search_path to '' as $$
 declare
   h text := lower(btrim(coalesce(p_entrada, '')));
   partes text[];
   n int;
+  compartido text;
+  dominio text;
 begin
   if h = '' then return null; end if;
   if position('@' in h) > 0 and position('/' in h) = 0 then h := split_part(h, '@', 2); end if;
@@ -205,15 +228,26 @@ begin
   h := regexp_replace(h, '[/?#].*$', '');
   h := regexp_replace(h, ':\d+$', '');
   h := regexp_replace(h, '\.$', '');
+  h := regexp_replace(h, '^www\.', '');
   if h = '' or position('.' in h) = 0 then return null; end if;
+  foreach compartido in array agents.hosts_compartidos() loop
+    if h = compartido then return null; end if;
+    if right(h, length(compartido) + 1) = '.' || compartido then
+      partes := string_to_array(left(h, length(h) - length(compartido) - 1), '.');
+      return partes[array_length(partes, 1)] || '.' || compartido;
+    end if;
+  end loop;
   partes := string_to_array(h, '.');
   n := array_length(partes, 1);
   if n >= 3 and (partes[n - 1] || '.' || partes[n]) = any (array[
       'com.es','org.es','nom.es','gob.es','edu.es','co.uk','org.uk','com.ar','com.mx','com.br','com.pt','co.es'])
   then
-    return partes[n - 2] || '.' || partes[n - 1] || '.' || partes[n];
+    dominio := partes[n - 2] || '.' || partes[n - 1] || '.' || partes[n];
+  else
+    dominio := partes[n - 1] || '.' || partes[n];
   end if;
-  return partes[n - 1] || '.' || partes[n];
+  if dominio = any (agents.plataformas_sin_dominio()) then return null; end if;
+  return dominio;
 end; $$;
 
 -- ¿Está suprimido este email o su dominio (o el de la web)?

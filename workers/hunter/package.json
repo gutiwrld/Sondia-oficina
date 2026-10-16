@@ -1,0 +1,21 @@
+{
+  "name": "@sondia/hunter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "seed:informe": "tsx src/seed/importar.ts --informe"
+  },
+  "dependencies": {
+    "@sondia/core": "workspace:*",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "tsx": "4.19.3",
+    "typescript": "5.7.3",
+    "vitest": "3.0.9"
+  }
+}

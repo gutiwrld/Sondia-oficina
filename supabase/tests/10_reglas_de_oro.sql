@@ -219,6 +219,17 @@ select pg_temp.ok(true, 'territorio y duplicados por email y dominio normalizado
 select pg_temp.ok(agents.dominio_registrable('https://WWW.Casa-Pepe.com.es/contacto?x=1') = 'casa-pepe.com.es', 'dominio .com.es');
 select pg_temp.ok(agents.dominio_registrable('Info@Reservas.Mesonvalderrey.com') = 'mesonvalderrey.com', 'dominio desde email con subdominio');
 select pg_temp.ok(agents.dominio_registrable('http://tienda.casapepe.es:8080/') = 'casapepe.es', 'dominio con puerto y subdominio');
+select pg_temp.ok(agents.dominio_registrable('http://lacasetadelforn.blogspot.com/') = 'lacasetadelforn.blogspot.com', 'hosting compartido: el dominio es el subdominio del negocio');
+select pg_temp.ok(agents.dominio_registrable('https://sites.google.com/view/casa') is null, 'plataforma sin dominio propio: sin dominio');
+
+-- Un «no» de un blog de Blogspot no suprime todo Blogspot.
+insert into public.clients (id, name, province, website, email, send_account) values
+  ('10000000-0000-0000-0000-00000000000a', 'La Caseta del Forn', 'Castellón', 'http://lacasetadelforn.blogspot.com', 'lacasetadelforn@gmail.com', 'guzmangonzalezperez@gmail.com'),
+  ('10000000-0000-0000-0000-00000000000b', 'Can Vilà', 'Barcelona', 'http://can-vila.blogspot.com', 'canvila@gmail.com', 'guzmangonzalezperez@gmail.com');
+update public.clients set do_not_contact = true where id = '10000000-0000-0000-0000-00000000000a';
+select pg_temp.ok(not exists (select 1 from agents.suppression_list where valor in ('blogspot.com', 'gmail.com')), 'nunca se suprime un hosting ni un proveedor de correo entero');
+select pg_temp.ok(not agents.esta_suprimido('canvila@gmail.com', 'http://can-vila.blogspot.com'), 'otro blog de Blogspot sigue siendo contactable');
+select pg_temp.ok(agents.esta_suprimido('otro@gmail.com', 'https://lacasetadelforn.blogspot.com/p/contacto.html'), 'el blog suprimido sigue suprimido con otra URL');
 
 -- ============================================================================
 -- Botón de pausa

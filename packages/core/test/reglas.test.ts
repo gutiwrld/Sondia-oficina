@@ -27,6 +27,25 @@ describe('dominios normalizados', () => {
     expect(dominioRegistrable('www.bodega.com.es')).toBe('bodega.com.es');
     expect(dominioRegistrable('https://shop.bodega.co.uk')).toBe('bodega.co.uk');
   });
+  it('en hostings compartidos el dominio es el subdominio del negocio, nunca el del hosting', () => {
+    expect(dominioRegistrable('http://lacasetadelforn.blogspot.com/')).toBe('lacasetadelforn.blogspot.com');
+    expect(dominioRegistrable('https://www.ciefocal-es.webnode.es/contacto')).toBe('ciefocal-es.webnode.es');
+    expect(dominioRegistrable('https://blog.masia.wordpress.com')).toBe('masia.wordpress.com');
+    expect(dominioRegistrable('blogspot.com')).toBeNull();
+  });
+  it('en plataformas sin dominio propio no hay dominio', () => {
+    expect(dominioRegistrable('https://sites.google.com/view/casarural')).toBeNull();
+    expect(dominioRegistrable('https://www.facebook.com/barpepe')).toBeNull();
+  });
+  it('suprimir un blog de Blogspot no bloquea a otro', () => {
+    const conocidos: Conocidos = {
+      emails: new Set(),
+      dominios: new Set(),
+      suprimidosEmail: new Set(['lacasetadelforn@gmail.com']),
+      suprimidosDominio: new Set([dominioRegistrable('http://lacasetadelforn.blogspot.com')!]),
+    };
+    expect(comprobarCandidato({ email: 'canvila@gmail.com', web: 'http://can-vila.blogspot.com' }, conocidos).ok).toBe(true);
+  });
   it('con email gratuito, el dominio del lead es el de su web', () => {
     expect(dominioDelLead({ email: 'pepe@gmail.com', web: 'http://www.casapepe.com' })).toBe('casapepe.com');
     expect(dominioDelLead({ email: 'hola@casapepe.com', web: 'http://otra.es' })).toBe('casapepe.com');
