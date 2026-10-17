@@ -1,6 +1,8 @@
 # Informe de importación del seed (en seco)
 
 > Generado por `pnpm seed:informe`. **No se ha escrito nada en la base de datos.** El SQL está en `supabase/seed/seed_hunter.sql` y se aplica cuando des el OK.
+>
+> **El ERP ya importó este volcado** en `public.clients` el 16-oct, con la misma clasificación. El seed de Hunter no crea clientes: vincula su ficha a cada cliente existente por email y mete en la lista de supresión a los 8 que ya estaban en «No contactar».
 
 ## Resumen
 

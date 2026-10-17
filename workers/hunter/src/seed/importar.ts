@@ -170,46 +170,47 @@ export function construirSeed() {
 // ---------------------------------------------------------------------------
 const q = (v: string | null | undefined) => (v === null || v === undefined ? 'null' : `'${v.replace(/'/g, "''")}'`);
 
+/**
+ * El ERP ya importó este mismo volcado en public.clients (16-oct-2026, con sus eventos de importación).
+ * Así que el seed de Hunter NO crea clientes: solo vincula su ficha (hunter.leads) a cada cliente existente
+ * por email, y mete en la lista de supresión a los que ya estaban en «No contactar» (se marcaron antes de que
+ * existiera el trigger). Si algún email no cruza, aborta entero.
+ */
 export function generarSql(s: ReturnType<typeof construirSeed>): string {
   const dominiosRepetidos = new Set(s.duplicadosDominio.map(([, b]) => b.seedId));
   const out: string[] = [
     '-- Seed de Hunter (volcado del 13-oct-2026). Generado por workers/hunter/src/seed/importar.ts. No editar a mano.',
-    '-- Idempotente: no hace nada si el seed ya está importado.',
+    '-- Vincula hunter.leads a los clientes que el ERP ya importó; no crea clientes ni eventos.',
     'begin;',
     "do $$ begin if exists (select 1 from hunter.leads where origen = 'seed') then raise exception 'SEED_YA_IMPORTADO'; end if; end $$;",
+    '',
+    '-- 1. Supresión de los que ya estaban en «No contactar» antes del trigger (irreversible).',
+    "select agents.suprimir_cliente(id, coalesce(nullif(do_not_contact_reason, ''), 'No contactar'), 'seed') from public.clients where do_not_contact;",
+    '',
+    '-- 2. Ficha de Hunter de cada lead del volcado.',
+    'create temp table seed_leads (email text primary key, dominio text, fuente text, provincia text, cuenta text, gancho text, prioridad text, seed_id text, primer_envio timestamptz) on commit drop;',
+    'insert into seed_leads values',
   ];
-  for (const l of s.leads) {
-    const p = l.pipeline;
-    const notas = [l.nota, p?.nota].filter(Boolean).join(' · ');
-    const valor = p?.valor_eur ? Number(p.valor_eur) : null;
-    const pricing = p ? (/comisi/i.test(p.servicio) ? "'fijo_comision'" : valor ? "'fijo'" : 'null') : 'null';
-    out.push(
-      `with c as (insert into public.clients (name, sector, city, province, website, email, phone, contact_name, stage, service, value_eur, pricing, next_action, notes, do_not_contact, do_not_contact_reason, email_bounced, lost_reason, source, send_account, email_subject, batch)
-  values (${q(l.nombre)}, ${q(l.sector)}, ${q(l.ciudad)}, ${q(l.provincia)}, ${q(l.web)}, ${q(l.email)}, ${q(l.telefono)}, ${q(p?.contacto ?? '')}, '${l.etapa}', ${q(p?.servicio ?? '')}, ${valor ?? 'null'}, ${pricing}, ${q(p?.proxima_accion ?? '')}, ${q(notas)}, ${l.noContactar}, ${q(l.noContactar ? l.nota : '')}, ${l.rebote}, ${q(l.decision === 'perdido_revisar' || l.rebote ? l.nota : '')}, 'seed-2026-10-13', ${q(l.cuenta ?? '')}, ${q(l.asunto)}, ${q(l.tanda)})
-  returning id),
-l as (insert into hunter.leads (client_id, email, dominio, email_fuente_url, provincia, socio, cuenta_email, gancho, prioridad, sin_hilo, origen, seed_id, primer_envio_at)
-  select id, ${q(l.email)}, ${dominiosRepetidos.has(l.seedId) ? 'null' : q(l.dominio)}, ${q(l.web)}, ${q(l.provincia)}, 'guzman', ${q(l.cuenta)}, ${q(l.gancho)}, ${l.prioridad ? q(l.prioridad) : 'null'}, false, 'seed', ${q(l.seedId)}, ${l.fecha && l.decision !== 'preparado' ? q(`${l.fecha}T09:00:00+02:00`) : 'null'} from c returning client_id)
-insert into public.client_events (client_id, type, body, occurred_at)
-  select client_id, 'importacion', ${q(
-    [
-      `Importado del tracker (${l.decision}).`,
-      l.asunto ? `Asunto: ${l.asunto}` : '',
-      l.problemas.length ? `Fallos: ${l.problemas.join(' | ')}` : '',
-      l.cuerpo ? `\n${l.cuerpo}` : '',
-      l.seguimiento ? `\nSeguimiento: ${l.seguimiento}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  )}, ${l.fecha ? q(`${l.fecha}T09:00:00+02:00`) : 'now()'} from l;`,
-    );
-  }
-  for (const cl of s.sinLead) {
-    out.push(
-      `insert into public.clients (name, sector, city, contact_name, stage, service, value_eur, next_action, notes, source)
-  values (${q(cl.cliente)}, ${q(cl.sector)}, ${q(cl.ciudad)}, ${q(cl.contacto)}, '${ETAPA_PIPELINE[cl.etapa.trim().toLowerCase()] ?? 'lead'}', ${q(cl.servicio)}, ${cl.valor_eur ? Number(cl.valor_eur) : 'null'}, ${q(cl.proxima_accion)}, ${q(cl.nota)}, 'clientes-csv-2026-10-13');`,
-    );
-  }
-  out.push('commit;');
+  out.push(
+    s.leads
+      .map(
+        (l) =>
+          `  (${q(l.email)}, ${dominiosRepetidos.has(l.seedId) ? 'null' : q(l.dominio)}, ${q(l.web)}, ${q(l.provincia)}, ${q(l.cuenta)}, ${q(l.gancho)}, ${l.prioridad ? q(l.prioridad) : 'null'}, ${q(l.seedId)}, ${l.fecha && l.decision !== 'preparado' ? q(`${l.fecha}T09:00:00+02:00`) : 'null'})`,
+      )
+      .join(',\n') + ';',
+  );
+  out.push(
+    `do $$ declare faltan text; begin
+  select string_agg(s.email, ', ') into faltan from seed_leads s
+  where not exists (select 1 from public.clients c where lower(btrim(c.email)) = s.email);
+  if faltan is not null then raise exception 'SEED_SIN_CLIENTE: %', faltan; end if;
+end $$;`,
+    `insert into hunter.leads (client_id, email, dominio, email_fuente_url, provincia, socio, cuenta_email, gancho, prioridad, sin_hilo, origen, seed_id, primer_envio_at)
+select c.id, s.email, s.dominio, s.fuente, s.provincia, 'guzman', s.cuenta, s.gancho, s.prioridad, false, 'seed', s.seed_id, s.primer_envio
+from seed_leads s join public.clients c on lower(btrim(c.email)) = s.email;`,
+    `do $$ begin if (select count(*) from hunter.leads where origen = 'seed') <> ${s.leads.length} then raise exception 'SEED_INCOMPLETO'; end if; end $$;`,
+    'commit;',
+  );
   return `${out.join('\n')}\n`;
 }
 
@@ -225,7 +226,7 @@ export function generarInforme(s: ReturnType<typeof construirSeed>): string {
 
   return `# Informe de importación del seed (en seco)
 
-> Generado por \`pnpm seed:informe\`. **No se ha escrito nada en la base de datos.** El SQL está en \`supabase/seed/seed_hunter.sql\` y se aplica cuando des el OK.
+> Generado por \`pnpm seed:informe\`. **No se ha escrito nada en la base de datos.** El SQL está en \`supabase/seed/seed_hunter.sql\` y se aplica cuando des el OK.\n>\n> **El ERP ya importó este volcado** en \`public.clients\` el 16-oct, con la misma clasificación. El seed de Hunter no crea clientes: vincula su ficha a cada cliente existente por email y mete en la lista de supresión a los 8 que ya estaban en «No contactar».
 
 ## Resumen
 
